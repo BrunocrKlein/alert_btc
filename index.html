@@ -1,24 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Teste Vibração</title>
-    <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <title>Alerta BTC Bybit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+      text-align: center;
+      padding: 30px;
+    }
+
+    button {
+      font-size: 20px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .valor {
+      font-size: 24px;
+      margin: 15px;
+    }
+  </style>
 </head>
 <body>
 
-<button onclick="vibrar()">Vibrar</button>
+  <h2>Alerta BTCUSDT.P Bybit</h2>
 
-<script>
-function vibrar() {
-    if (navigator.vibrate) {
-        navigator.vibrate(2000);
-        alert("Comando enviado");
-    } else {
-        alert("Vibration API não suportada");
+  <div class="valor">Preço: <span id="preco">--</span></div>
+  <div class="valor">Média 300 High: <span id="media">--</span></div>
+  <div class="valor">Status: <span id="status">Parado</span></div>
+
+  <button onclick="iniciar()">Iniciar alerta</button>
+  <button onclick="parar()">Parar</button>
+
+  <script>
+    let ativo = false;
+    let alertou = false;
+
+    const INTERVALO = "3"; // 3 minuto
+    const SYMBOL = "BTCUSDT";
+    const LIMITE = 300;
+
+    async function buscarDados() {
+      const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${INTERVALO}&limit=${LIMITE}`;
+
+      const resposta = await fetch(url);
+      const json = await resposta.json();
+
+      const candles = json.result.list;
+
+      // Bybit retorna do mais recente para o mais antigo
+      const highs = candles.map(c => parseFloat(c[2])); // índice 2 = high
+      const closes = candles.map(c => parseFloat(c[4])); // índice 4 = close
+
+      const mediaHigh300 = highs.reduce((a, b) => a + b, 0) / highs.length;
+      const precoAtual = closes[0];
+
+      document.getElementById("preco").innerText = precoAtual.toFixed(2);
+      document.getElementById("media").innerText = mediaHigh300.toFixed(2);
+
+      verificarToque(precoAtual, mediaHigh300);
     }
-}
-</script>
+
+    function verificarToque(preco, media) {
+      const tolerancia = media * 0.0005; // 0,05%
+
+      const tocou = Math.abs(preco - media) <= tolerancia;
+
+      if (tocou && !alertou) {
+        document.getElementById("status").innerText = "TOCOU NA MÉDIA!";
+        vibrar();
+        alertou = true;
+      }
+
+      if (!tocou) {
+        document.getElementById("status").innerText = "Monitorando...";
+        alertou = false;
+      }
+    }
+
+    function vibrar() {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([1000, 500, 1000, 500, 1000]);
+      } else {
+        alert("Preço tocou na média!");
+      }
+    }
+
+    function iniciar() {
+      ativo = true;
+      document.getElementById("status").innerText = "Monitorando...";
+
+      buscarDados();
+
+      setInterval(() => {
+        if (ativo) {
+          buscarDados();
+        }
+      }, 10000); // consulta a cada 10 segundos
+    }
+
+    function parar() {
+      ativo = false;
+      document.getElementById("status").innerText = "Parado";
+    }
+  </script>
 
 </body>
 </html>
