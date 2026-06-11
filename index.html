@@ -39,6 +39,7 @@
   <button onclick="parar()">Parar</button>
 
   <script>
+    navigator.wakeLock.request('screen');
     let ativo = false;
     let alertou = false;
     let intervaloConsulta = null;
