@@ -5,6 +5,7 @@
   <title>Alerta BTC Bybit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="manifest" href="manifest.json">
+
   <style>
     body {
       font-family: Arial;
@@ -40,30 +41,40 @@
   <script>
     let ativo = false;
     let alertou = false;
+    let intervaloConsulta = null;
+    let intervaloVibracaoPeriodica = null;
 
-    const INTERVALO = "3"; // 3 minuto
+    const INTERVALO = "3"; // timeframe da Bybit: 3 minutos
     const SYMBOL = "BTCUSDT";
     const LIMITE = 300;
 
+    // ALTERE AQUI O TEMPO DA VIBRAÇÃO AUTOMÁTICA
+    const VIBRACAO_PERIODICA_MINUTOS = 5;
+
     async function buscarDados() {
-      const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${INTERVALO}&limit=${LIMITE}`;
+      try {
+        const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${INTERVALO}&limit=${LIMITE}`;
 
-      const resposta = await fetch(url);
-      const json = await resposta.json();
+        const resposta = await fetch(url);
+        const json = await resposta.json();
 
-      const candles = json.result.list;
+        const candles = json.result.list;
 
-      // Bybit retorna do mais recente para o mais antigo
-      const highs = candles.map(c => parseFloat(c[2])); // índice 2 = high
-      const closes = candles.map(c => parseFloat(c[4])); // índice 4 = close
+        const highs = candles.map(c => parseFloat(c[2]));
+        const closes = candles.map(c => parseFloat(c[4]));
 
-      const mediaHigh300 = highs.reduce((a, b) => a + b, 0) / highs.length;
-      const precoAtual = closes[0];
+        const mediaHigh300 = highs.reduce((a, b) => a + b, 0) / highs.length;
+        const precoAtual = closes[0];
 
-      document.getElementById("preco").innerText = precoAtual.toFixed(2);
-      document.getElementById("media").innerText = mediaHigh300.toFixed(2);
+        document.getElementById("preco").innerText = precoAtual.toFixed(2);
+        document.getElementById("media").innerText = mediaHigh300.toFixed(2);
 
-      verificarToque(precoAtual, mediaHigh300);
+        verificarToque(precoAtual, mediaHigh300);
+
+      } catch (erro) {
+        document.getElementById("status").innerText = "Erro ao buscar dados";
+        console.error(erro);
+      }
     }
 
     function verificarToque(preco, media) {
@@ -92,20 +103,37 @@
     }
 
     function iniciar() {
+      if (ativo) return;
+
       ativo = true;
       document.getElementById("status").innerText = "Monitorando...";
 
       buscarDados();
 
-      setInterval(() => {
+      intervaloConsulta = setInterval(() => {
         if (ativo) {
           buscarDados();
         }
-      }, 10000); // consulta a cada 10 segundos
+      }, 10000);
+
+      intervaloVibracaoPeriodica = setInterval(() => {
+        if (ativo) {
+          vibrar();
+        }
+      }, VIBRACAO_PERIODICA_MINUTOS * 60 * 1000);
     }
 
     function parar() {
       ativo = false;
+
+      clearInterval(intervaloConsulta);
+      clearInterval(intervaloVibracaoPeriodica);
+
+      intervaloConsulta = null;
+      intervaloVibracaoPeriodica = null;
+
+      navigator.vibrate(0);
+
       document.getElementById("status").innerText = "Parado";
     }
   </script>
